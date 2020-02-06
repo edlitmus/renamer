@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strings"
+	"unicode"
 
 	yaml "github.com/esilva-everbridge/yaml"
 	"github.com/pioz/tvdb"
@@ -39,7 +41,12 @@ func main() {
 	for _, e := range series.Episodes {
 		if e.AiredSeason == 1 {
 			fmt.Printf("S%0.2dE%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
+			name := strings.TrimRightFunc(e.EpisodeName, func(r rune) bool {
+				return !unicode.IsLetter(r)
+			})
+			fmt.Printf("NAME: %s\n", strings.ToLower(name))
 		}
+
 		// TODO: need to traverse sXXeXXpXX dirs and rename files as needed after capturing the 'part' number and matching
 		// targetDirectory := os.Args[1] // get the target directory
 		// fileName := os.Args[2:]       // to handle wildcard such as filename*.go

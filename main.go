@@ -14,6 +14,11 @@ import (
 )
 
 func main() {
+	// if len(os.Args) <= 2 {
+	// 	fmt.Printf("USAGE : %s <target_directory> <target_filename or part of filename> \n", os.Args[0])
+	// 	os.Exit(0)
+	// }
+
 	config := yaml.New()
 	configFile := createConfigPath()
 	initConfig(configFile, config)
@@ -32,11 +37,15 @@ func main() {
 	}
 
 	for _, e := range series.Episodes {
-		fmt.Printf("S%0.2dE%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
-	}
+		if e.AiredSeason == 1 {
+			fmt.Printf("S%0.2dE%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
+		}
+		// TODO: need to traverse sXXeXXpXX dirs and rename files as needed after capturing the 'part' number and matching
+		// targetDirectory := os.Args[1] // get the target directory
+		// fileName := os.Args[2:]       // to handle wildcard such as filename*.go
 
-	// Print the title of the episode 4x08 (season 4, episode 8)
-	fmt.Printf(series.GetEpisode(4, 8).EpisodeName)
+		// findFile(targetDirectory, fileName)
+	}
 }
 
 func tvdbClient(tvDBConfig interface{}) tvdb.Client {
@@ -73,45 +82,18 @@ func initConfig(configFile string, config *yaml.Yaml) {
 	}
 }
 
-// // findFiles recurses through the given searchDir returning a list of files and it's length
-// func findFiles(searchDir string, ext string) ([]string, int) {
-// 	fileList := []string{}
-// 	searchDir, err := filepath.Abs(searchDir)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 		return fileList, 0
-// 	}
-// 	err = checkForDir(searchDir)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 		return fileList, 0
-// 	}
+// TODO: use this with a walk func to recurse
+func findFile(targetDir string, pattern []string) {
 
-// 	err = filepath.Walk(searchDir, func(path string, f os.FileInfo, err error) error {
-// 		if !f.IsDir() {
-// 			fileList = append(fileList, path)
-// 		}
-// 		return nil
-// 	})
-// 	if err != nil {
-// 		log.Fatalf("error walking file path: %s", err)
-// 	}
+	for _, v := range pattern {
+		matches, err := filepath.Glob(targetDir + v)
 
-// 	return fileList, len(fileList)
-// }
+		if err != nil {
+			fmt.Println(err)
+		}
 
-// //checkForDir does exactly what it says on the tin
-// func checkForDir(filePath string) error {
-// 	fi, err := os.Stat(filePath)
-// 	if err != nil {
-// 		return fmt.Errorf("cannot stat %s: %s", filePath, err)
-// 	}
-// 	switch mode := fi.Mode(); {
-// 	case mode.IsRegular():
-// 		return fmt.Errorf("%s is a file", filePath)
-// 	case mode.IsDir():
-// 		return nil
-// 	}
-
-// 	return err
-// }
+		if len(matches) != 0 {
+			fmt.Println("Found : ", matches)
+		}
+	}
+}

@@ -30,6 +30,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	for _, e := range series.Episodes {
+		fmt.Printf("S%0.2dE%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
+	}
+
 	// Print the title of the episode 4x08 (season 4, episode 8)
 	fmt.Printf(series.GetEpisode(4, 8).EpisodeName)
 }

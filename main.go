@@ -7,52 +7,71 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"strings"
-	"unicode"
+	"regexp"
+	"strconv"
 
 	yaml "github.com/esilva-everbridge/yaml"
 	"github.com/pioz/tvdb"
 	yamlv2 "gopkg.in/yaml.v2"
 )
 
+var series tvdb.Series
+
 func main() {
-	// if len(os.Args) <= 2 {
-	// 	fmt.Printf("USAGE : %s <target_directory> <target_filename or part of filename> \n", os.Args[0])
-	// 	os.Exit(0)
-	// }
+	if len(os.Args) <= 1 {
+		fmt.Printf("USAGE : %s <target_directory>\n", os.Args[0])
+		os.Exit(0)
+	}
+	targetDirectory := os.Args[1] // get the target directory
+	err := os.Chdir(targetDirectory)
+	if err != nil {
+		panic(err)
+	}
 
 	config := yaml.New()
 	configFile := createConfigPath()
 	initConfig(configFile, config)
 	c := tvdbClient(config.Get("the_tvdb_api"))
 
-	// tt0056751
+	// tt0056751 == Doctor Who (1963)
 	matches, err := c.SearchByImdbID("tt0056751")
 	// series, err := c.BestSearch("Doctor Who (1963)")
 	if err != nil {
 		panic(err)
 	}
-	series := matches[0]
+	series = matches[0]
 	err = c.GetSeriesEpisodes(&series, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	for _, e := range series.Episodes {
-		if e.AiredSeason == 1 {
-			fmt.Printf("S%0.2dE%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
-			name := strings.TrimRightFunc(e.EpisodeName, func(r rune) bool {
-				return !unicode.IsLetter(r)
-			})
-			fmt.Printf("NAME: %s\n", strings.ToLower(name))
-		}
-
-		// TODO: need to traverse sXXeXXpXX dirs and rename files as needed after capturing the 'part' number and matching
-		// targetDirectory := os.Args[1] // get the target directory
-		// fileName := os.Args[2:]       // to handle wildcard such as filename*.go
-
-		// findFile(targetDirectory, fileName)
+	files, err := ioutil.ReadDir("./")
+	if err != nil {
+		log.Fatal(err)
 	}
+
+	for _, f := range files {
+		re := regexp.MustCompile(`^s(\d+)e(\d+).*?$`)
+		if f.IsDir() {
+			matches := re.FindStringSubmatch(f.Name())
+			s, _ := strconv.Atoi(matches[1])
+			ep, _ := strconv.Atoi(matches[2])
+			e := findEpisode(s, ep)
+			if e == nil {
+				continue
+			}
+			fmt.Printf("s%0.2de%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
+		}
+	}
+}
+
+func findEpisode(season, episode int) *tvdb.Episode {
+	for _, e := range series.Episodes {
+		if e.AiredSeason == season && e.AiredEpisodeNumber == episode {
+			return &e
+		}
+	}
+	return nil
 }
 
 func tvdbClient(tvDBConfig interface{}) tvdb.Client {
@@ -86,21 +105,5 @@ func initConfig(configFile string, config *yaml.Yaml) {
 	err = yamlv2.Unmarshal(buf, &config.Values)
 	if err != nil {
 		log.Fatal(err)
-	}
-}
-
-// TODO: use this with a walk func to recurse
-func findFile(targetDir string, pattern []string) {
-
-	for _, v := range pattern {
-		matches, err := filepath.Glob(targetDir + v)
-
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		if len(matches) != 0 {
-			fmt.Println("Found : ", matches)
-		}
 	}
 }

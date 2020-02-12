@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -45,29 +46,49 @@ func main() {
 		panic(err)
 	}
 
-	files, err := ioutil.ReadDir("./")
+	dirs, err := ioutil.ReadDir("./")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	for _, f := range files {
-		re := regexp.MustCompile(`^s(\d+)e(\d+).*?$`)
-		if f.IsDir() {
-			matches := re.FindStringSubmatch(f.Name())
-			s, _ := strconv.Atoi(matches[1])
-			ep, _ := strconv.Atoi(matches[2])
-			e := findEpisode(s, ep)
-			if e == nil {
-				continue
+	for _, d := range dirs {
+		if d.IsDir() {
+			files, _ := findFilesByExt(d.Name(), ".avi")
+			for _, f := range files {
+				fmt.Printf("FOUND: %s\n", f)
+				re := regexp.MustCompile(`s(\d+)e(\d+)p(\d+)\s(.*?)\.avi`)
+				matches := re.FindStringSubmatch(f)
+				fmt.Printf("MATCHES: %v\n", matches)
+				if len(matches) > 0 {
+					s, _ := strconv.Atoi(matches[1])
+					// ep, _ := strconv.Atoi(matches[2])
+					part, _ := strconv.Atoi(matches[3])
+					name := fmt.Sprintf("%s (%d)", matches[4], part)
+					// e := findEpisode(s, ep)
+					e := findEpisodeByName(s, name)
+					if e == nil {
+						continue
+					}
+					dump(e)
+					// fmt.Printf("s%0.2de%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
+				}
 			}
-			fmt.Printf("s%0.2de%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
 		}
 	}
 }
 
-func findEpisode(season, episode int) *tvdb.Episode {
+// func findEpisode(season, episode int) *tvdb.Episode {
+// 	for _, e := range series.Episodes {
+// 		if e.AiredSeason == season && e.AiredEpisodeNumber == episode {
+// 			return &e
+// 		}
+// 	}
+// 	return nil
+// }
+
+func findEpisodeByName(season int, name string) *tvdb.Episode {
 	for _, e := range series.Episodes {
-		if e.AiredSeason == season && e.AiredEpisodeNumber == episode {
+		if e.AiredSeason == season && e.EpisodeName == name {
 			return &e
 		}
 	}
@@ -106,4 +127,55 @@ func initConfig(configFile string, config *yaml.Yaml) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+//checkForDir does exactly what it says on the tin
+func checkForDir(filePath string) error {
+	fi, err := os.Stat(filePath)
+	if err != nil {
+		return fmt.Errorf("cannot stat %s: %s", filePath, err)
+	}
+	switch mode := fi.Mode(); {
+	case mode.IsRegular():
+		return fmt.Errorf("%s is a file", filePath)
+	case mode.IsDir():
+		return nil
+	}
+
+	return err
+}
+
+func findFilesByExt(searchDir string, ext string) ([]string, int) {
+	fileList := []string{}
+	searchDir, err := filepath.Abs(searchDir)
+	if err != nil {
+		log.Fatal(err)
+		return fileList, 0
+	}
+	err = checkForDir(searchDir)
+	if err != nil {
+		log.Fatal(err)
+		return fileList, 0
+	}
+
+	err = filepath.Walk(searchDir, func(path string, f os.FileInfo, err error) error {
+		if !f.IsDir() && filepath.Ext(f.Name()) == ext {
+			fileList = append(fileList, path)
+		}
+		return nil
+	})
+	if err != nil {
+		log.Fatal("error walking file path: ", err)
+	}
+
+	return fileList, len(fileList)
+}
+
+// dump is useful for debugging
+func dump(thing interface{}) {
+	json, err := json.MarshalIndent(thing, "", "  ")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(json))
 }

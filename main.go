@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	yaml "github.com/esilva-everbridge/yaml"
 	"github.com/pioz/tvdb"
@@ -51,29 +52,57 @@ func main() {
 		log.Fatal(err)
 	}
 
+	limit := 10
 	for _, d := range dirs {
-		if d.IsDir() {
-			files, _ := findFilesByExt(d.Name(), ".avi")
-			for _, f := range files {
-				fmt.Printf("FOUND: %s\n", f)
-				re := regexp.MustCompile(`s(\d+)e(\d+)p(\d+)\s(.*?)\.avi`)
-				matches := re.FindStringSubmatch(f)
-				fmt.Printf("MATCHES: %v\n", matches)
-				if len(matches) > 0 {
-					s, _ := strconv.Atoi(matches[1])
-					// ep, _ := strconv.Atoi(matches[2])
-					part, _ := strconv.Atoi(matches[3])
-					name := fmt.Sprintf("%s (%d)", matches[4], part)
-					// e := findEpisode(s, ep)
-					e := findEpisodeByName(s, name)
-					if e == nil {
-						continue
-					}
-					dump(e)
-					// fmt.Printf("s%0.2de%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
+		if limit == 0 {
+			break
+		}
+		// fmt.Println(d.Name())
+		if d.IsDir() && strings.HasPrefix(d.Name(), "s") {
+			fmt.Printf("FOUND: %s\n", d.Name())
+			re := regexp.MustCompile(`(?i)s(\d+)e(\d+)\s(.*?)$`)
+			matches := re.FindStringSubmatch(d.Name())
+			fmt.Printf("MATCHES: %#v\n", matches)
+			if len(matches) > 0 {
+				s, _ := strconv.Atoi(matches[1])
+				// ep, _ := strconv.Atoi(matches[2])
+				name := matches[3]
+				name = strings.Split(name, "(")[0]
+				// e := findEpisode(s, ep)
+				eps := findEpisodesByName(s, name)
+				if len(eps) == 0 {
+					fmt.Println("can't find a match for " + name)
+					continue
+				}
+				// dump(eps)
+				for _, e := range eps {
+					fmt.Printf("DIR MATCH: s%0.2de%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
 				}
 			}
+			limit--
 		}
+		//  else {
+		// 	fmt.Printf("FOUND FILE: %s\n", d.Name())
+		// 	re := regexp.MustCompile(`s(\d+)e(\d+)p(\d+)\s(.*?)\s*\(*.*?$`)
+		// 	matches := re.FindStringSubmatch(d.Name())
+		// 	fmt.Printf("MATCHES: %v\n", matches)
+		// 	if len(matches) > 0 {
+		// 		s, _ := strconv.Atoi(matches[1])
+		// 		// ep, _ := strconv.Atoi(matches[2])
+		// 		part, _ := strconv.Atoi(matches[3])
+		// 		name := fmt.Sprintf("%s (%d)", matches[4], part)
+		// 		// e := findEpisode(s, ep)
+		// 		eps := findEpisodesByName(s, name)
+		// 		if len(eps) == 0 {
+		// 			fmt.Println("can't find a match for " + name)
+		// 			continue
+		// 		}
+		// 		// dump(eps)
+		// 		for _, e := range eps {
+		// 			fmt.Printf("FILE MATCH: s%0.2de%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
+		// 		}
+		// 	}
+		// }
 	}
 }
 
@@ -86,13 +115,14 @@ func main() {
 // 	return nil
 // }
 
-func findEpisodeByName(season int, name string) *tvdb.Episode {
+func findEpisodesByName(season int, name string) []tvdb.Episode {
+	eps := make([]tvdb.Episode, 0)
 	for _, e := range series.Episodes {
-		if e.AiredSeason == season && e.EpisodeName == name {
-			return &e
+		if e.AiredSeason == season && strings.HasPrefix(e.EpisodeName, name) {
+			eps = append(eps, e)
 		}
 	}
-	return nil
+	return eps
 }
 
 func tvdbClient(tvDBConfig interface{}) tvdb.Client {

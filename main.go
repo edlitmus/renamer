@@ -47,78 +47,124 @@ func main() {
 		panic(err)
 	}
 
-	dirs, err := ioutil.ReadDir("./")
-	if err != nil {
-		log.Fatal(err)
+	var files []string
+	mkvFiles, count := findFilesByExt("./", ".mkv")
+	fmt.Printf("FOUND %d MKV files\n", count)
+	files = append(files, mkvFiles...)
+	aviFiles, count := findFilesByExt("./", ".avi")
+	fmt.Printf("FOUND %d AVI files\n", count)
+	files = append(files, aviFiles...)
+
+	// dump(files)
+	re := regexp.MustCompile(`s(\d+)e(\d+)p(\d+)\s*(.*?)\.\w{3}$`)
+	for _, file := range files {
+		fileInfo, err := os.Stat(file)
+		if err != nil {
+			panic(err)
+		}
+		// dump(fileInfo.Name())
+		matches := re.FindStringSubmatch(fileInfo.Name())
+		if len(matches) > 0 {
+			fmt.Printf("MATCHES: %#v\n", matches)
+			s, _ := strconv.Atoi(matches[1])
+			// part, _ := strconv.Atoi(matches[3])
+			// name := fmt.Sprintf("%s (%d)", matches[4], part)
+			name := matches[4]
+			if strings.Contains(name, "(") {
+				name = strings.Split(name, "(")[0]
+			}
+			if strings.Contains(name, "\\") {
+				name = strings.Split(name, "\\")[0]
+			}
+			name = strings.TrimSpace(name)
+			e := findEpisode(s, name)
+			if e.Empty() {
+				fmt.Println("can't find a match for " + name)
+				continue
+			}
+			// dump(e)
+			fileName := fmt.Sprintf("%s - S%0.2dE%0.2d - %s.avi", "Doctor Who (1963)", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
+			err = os.Rename(file, fileName)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("RENAMED TO '%s'\n", fileName)
+		}
 	}
 
-	limit := 10
-	for _, d := range dirs {
-		if limit == 0 {
-			break
-		}
-		// fmt.Println(d.Name())
-		if d.IsDir() && strings.HasPrefix(d.Name(), "s") {
-			fmt.Printf("FOUND: %s\n", d.Name())
-			re := regexp.MustCompile(`(?i)s(\d+)e(\d+)\s(.*?)$`)
-			matches := re.FindStringSubmatch(d.Name())
-			fmt.Printf("MATCHES: %#v\n", matches)
-			if len(matches) > 0 {
-				s, _ := strconv.Atoi(matches[1])
-				// ep, _ := strconv.Atoi(matches[2])
-				name := matches[3]
-				name = strings.Split(name, "(")[0]
-				// e := findEpisode(s, ep)
-				eps := findEpisodesByName(s, name)
-				if len(eps) == 0 {
-					fmt.Println("can't find a match for " + name)
-					continue
-				}
-				// dump(eps)
-				for _, e := range eps {
-					fmt.Printf("DIR MATCH: s%0.2de%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
-				}
-			}
-			limit--
-		}
-		//  else {
-		// 	fmt.Printf("FOUND FILE: %s\n", d.Name())
-		// 	re := regexp.MustCompile(`s(\d+)e(\d+)p(\d+)\s(.*?)\s*\(*.*?$`)
-		// 	matches := re.FindStringSubmatch(d.Name())
-		// 	fmt.Printf("MATCHES: %v\n", matches)
-		// 	if len(matches) > 0 {
-		// 		s, _ := strconv.Atoi(matches[1])
-		// 		// ep, _ := strconv.Atoi(matches[2])
-		// 		part, _ := strconv.Atoi(matches[3])
-		// 		name := fmt.Sprintf("%s (%d)", matches[4], part)
-		// 		// e := findEpisode(s, ep)
-		// 		eps := findEpisodesByName(s, name)
-		// 		if len(eps) == 0 {
-		// 			fmt.Println("can't find a match for " + name)
-		// 			continue
-		// 		}
-		// 		// dump(eps)
-		// 		for _, e := range eps {
-		// 			fmt.Printf("FILE MATCH: s%0.2de%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
-		// 		}
-		// 	}
-		// }
-	}
+	// dirs, err := ioutil.ReadDir("./")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	// for _, d := range dirs {
+	// 	if limit == 0 {
+	// 		break
+	// 	}
+	// 	// fmt.Println(d.Name())
+	// 	if d.IsDir() && strings.HasPrefix(d.Name(), "s") {
+	// 		fmt.Printf("FOUND: %s\n", d.Name())
+	// 		re := regexp.MustCompile(`(?i)s(\d+)e(\d+)\s(.*?)$`)
+	// 		matches := re.FindStringSubmatch(d.Name())
+	// 		fmt.Printf("MATCHES: %#v\n", matches)
+	// 		if len(matches) > 0 {
+	// 			s, _ := strconv.Atoi(matches[1])
+	// 			// ep, _ := strconv.Atoi(matches[2])
+	// 			name := matches[3]
+	// 			name = strings.Split(name, "(")[0]
+	// 			// e := findEpisode(s, ep)
+	// 			eps := findEpisodesByName(s, name)
+	// 			if len(eps) == 0 {
+	// 				fmt.Println("can't find a match for " + name)
+	// 				continue
+	// 			}
+	// 			// dump(eps)
+	// 			for _, e := range eps {
+	// 				fmt.Printf("DIR MATCH: s%0.2de%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
+	// 			}
+	// 		}
+	// 		limit--
+	// 	}
+	// 	//  else {
+	// 	// 	fmt.Printf("FOUND FILE: %s\n", d.Name())
+	// 	// 	re := regexp.MustCompile(`s(\d+)e(\d+)p(\d+)\s(.*?)\s*\(*.*?$`)
+	// 	// 	matches := re.FindStringSubmatch(d.Name())
+	// 	// 	fmt.Printf("MATCHES: %v\n", matches)
+	// 	// 	if len(matches) > 0 {
+	// 	// 		s, _ := strconv.Atoi(matches[1])
+	// 	// 		// ep, _ := strconv.Atoi(matches[2])
+	// 	// 		part, _ := strconv.Atoi(matches[3])
+	// 	// 		name := fmt.Sprintf("%s (%d)", matches[4], part)
+	// 	// 		// e := findEpisode(s, ep)
+	// 	// 		eps := findEpisodesByName(s, name)
+	// 	// 		if len(eps) == 0 {
+	// 	// 			fmt.Println("can't find a match for " + name)
+	// 	// 			continue
+	// 	// 		}
+	// 	// 		// dump(eps)
+	// 	// 		for _, e := range eps {
+	// 	// 			fmt.Printf("FILE MATCH: s%0.2de%0.2d %s\n", e.AiredSeason, e.AiredEpisodeNumber, e.EpisodeName)
+	// 	// 		}
+	// 	// 	}
+	// 	// }
+	// }
 }
 
-// func findEpisode(season, episode int) *tvdb.Episode {
-// 	for _, e := range series.Episodes {
-// 		if e.AiredSeason == season && e.AiredEpisodeNumber == episode {
-// 			return &e
-// 		}
-// 	}
-// 	return nil
-// }
+func findEpisode(season int, name string) tvdb.Episode {
+	var e tvdb.Episode
+	fmt.Printf("LOOKIG FOR '%s'\n", name)
+	for _, e := range series.Episodes {
+		if e.AiredSeason == season && strings.Contains(e.EpisodeName, name) {
+			return e
+		}
+	}
+	return e
+}
 
 func findEpisodesByName(season int, name string) []tvdb.Episode {
 	eps := make([]tvdb.Episode, 0)
 	for _, e := range series.Episodes {
-		if e.AiredSeason == season && strings.HasPrefix(e.EpisodeName, name) {
+		if e.AiredSeason == season && strings.Contains(e.EpisodeName, name) {
 			eps = append(eps, e)
 		}
 	}
